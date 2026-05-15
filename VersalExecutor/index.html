@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Versal</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#090910;
+  --surf:#0f0f18;
+  --surf2:#141420;
+  --surf3:#1a1a28;
+  --hover:#1f1f30;
+  --active:#242438;
+  --line:#1e1e2e;
+  --line2:#282840;
+  --fg:#cdd6f4;
+  --fg2:#9399b2;
+  --fg3:#585b70;
+  --fg4:#313244;
+  --hi:#f0f0ff;
+  --pk:#c084fc;
+  --pk2:#a855f7;
+  --pk3:#d8b4fe;
+  --pk-glow:rgba(168,85,247,.18);
+  --pk-border:rgba(192,132,252,.22);
+  --ok:#a6e3a1;
+  --ok2:#4ade80;
+  --err:#f38ba8;
+  --warn:#f9e2af;
+  --blue:#89b4fa;
+  --r:8px;
+  --r2:12px;
+  --r3:20px;
+}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--fg);
+  font-family:'Inter',system-ui,sans-serif;font-size:12px;
+  overflow:hidden;user-select:none;-webkit-font-smoothing:antialiased}
+
+/* ═══ LAYOUT ═══════════════════════════════ */
+#root{display:flex;flex-direction:column;height:100vh;position:relative}
+#titlebar{height:46px;display:flex;align-items:center;gap:0;
+  background:var(--surf);border-bottom:1px solid var(--line);
+  flex-shrink:0;position:relative;z-index:100;padding:0 14px}
+#body{flex:1;display:flex;overflow:hidden;min-height:0}
+#rail{width:46px;flex-shrink:0;display:flex;flex-direction:column;
+  align-items:center;padding:10px 0;gap:3px;
+  background:var(--surf);border-right:1px solid var(--line)}
+#sidebar{width:205px;flex-shrink:0;display:flex;flex-direction:column;
+  background:var(--surf);border-right:1px solid var(--line);overflow:hidden;
+  transition:width .2s ease}
+#editor-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+#statusbar{height:22px;flex-shrink:0;display:flex;align-items:center;gap:0;
+  background:var(--surf);border-top:1px solid var(--line);
+  padding:0 10px;overflow:hidden}
+
+/* ═══ TITLEBAR ═══════════════════════════════ */
+.tb-brand{display:flex;align-items:center;gap:9px;margin-right:14px}
+.tb-logo{width:24px;height:24px;border-radius:7px;flex-shrink:0;
+  background:linear-gradient(135deg,#7c3aed,#c084fc);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 14px rgba(168,85,247,.4)}
+.tb-logo svg{width:13px;height:13px}
+.tb-name{font-size:13px;font-weight:700;letter-spacing:.02em;color:var(--hi)}
+.tb-divider{width:1px;height:18px;background:var(--line2);margin:0 12px;flex-shrink:0}
+
+/* Target / process selector */
+.tb-target{display:flex;align-items:center;gap:8px;padding:5px 10px 5px 9px;
+  background:var(--surf2);border:1px solid var(--line2);border-radius:var(--r);
+  cursor:pointer;transition:all .15s;position:relative;min-width:140px}
+.tb-target:hover{border-color:var(--pk-border);background:var(--hover)}
+.tb-target.open{border-color:var(--pk-border);background:var(--hover)}
+.tb-target-left{flex:1;min-width:0}
+.tb-target-key{font-size:9px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--fg3);line-height:1;margin-bottom:3px}
+.tb-target-val{font-family:'JetBrains Mono',monospace;font-size:11px;
+  font-weight:500;color:var(--fg);line-height:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-target-val.none{color:var(--fg3);font-style:italic;font-family:'Inter',sans-serif;font-size:11px}
+.tb-caret{color:var(--fg3);flex-shrink:0;transition:transform .15s}
+.tb-target.open .tb-caret{transform:rotate(180deg)}
+
+/* Process dropdown */
+#proc-dropdown{position:absolute;top:calc(100% + 6px);left:0;min-width:260px;
+  background:var(--surf2);border:1px solid var(--line2);border-radius:var(--r2);
+  box-shadow:0 16px 40px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.04);
+  overflow:hidden;display:none;flex-direction:column;z-index:999;
+  animation:dropIn .15s cubic-bezier(.2,.8,.4,1)}
+#proc-dropdown.open{display:flex}
+.proc-header{padding:9px 13px 7px;border-bottom:1px solid var(--line);
+  font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--fg3)}
+.proc-list{max-height:200px;overflow-y:auto}
+.proc-list::-webkit-scrollbar{width:3px}
+.proc-list::-webkit-scrollbar-thumb{background:var(--line2);border-radius:2px}
+.proc-item{display:flex;align-items:center;gap:10px;padding:9px 13px;
+  cursor:pointer;transition:background .1s;border-bottom:1px solid var(--line)}
+.proc-item:last-child{border-bottom:none}
+.proc-item:hover{background:var(--hover)}
+.proc-item.selected{background:var(--pk-glow)}
+.proc-dot{width:7px;height:7px;border-radius:50%;background:var(--ok2);
+  box-shadow:0 0 6px var(--ok2);flex-shrink:0}
+.proc-info{flex:1;min-width:0}
+.proc-name{font-size:12px;font-weight:500;color:var(--hi);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proc-pid{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--fg3);margin-top:1px}
+.proc-empty{padding:18px 13px;text-align:center;font-size:11px;
+  color:var(--fg3);line-height:17px;font-style:italic}
+.proc-footer{padding:7px 13px;border-top:1px solid var(--line);
+  display:flex;gap:6px}
+.proc-refresh{flex:1;height:26px;border-radius:var(--r);border:1px solid var(--line2);
+  background:transparent;color:var(--fg2);font-family:'Inter',sans-serif;
+  font-size:11px;cursor:pointer;transition:all .12s;display:flex;align-items:center;
+  justify-content:center;gap:5px}
+.proc-refresh:hover{border-color:var(--pk-border);color:var(--pk3)}
+
+.tb-gap{flex:1}
+
+/* Pill */
+.tb-pill{display:flex;align-items:center;gap:6px;padding:4px 11px;
+  border-radius:var(--r3);border:1px solid var(--line2);background:var(--surf2);
+  font-size:10px;font-weight:600;letter-spacing:.05em;color:var(--fg3);
+  transition:all .3s}
+.tb-pill .pdot{width:5px;height:5px;border-radius:50%;background:var(--fg4);
+  flex-shrink:0;transition:all .3s}
+.tb-pill.editing .pdot{background:var(--pk);box-shadow:0 0 7px var(--pk)}
+.tb-pill.editing{color:var(--pk3);border-color:var(--pk-border)}
+.tb-pill.attached .pdot{background:var(--ok2);box-shadow:0 0 7px var(--ok2)}
+.tb-pill.attached{color:var(--ok);border-color:rgba(74,222,128,.25)}
+.tb-pill.injecting .pdot{background:var(--warn);animation:blink .5s step-start infinite}
+.tb-pill.injecting{color:var(--warn);border-color:rgba(249,226,175,.25)}
+
+/* Titlebar action buttons */
+.tb-actions{display:flex;align-items:center;gap:5px;margin-left:10px}
+.tb-btn{height:28px;padding:0 13px;border-radius:var(--r);
+  border:1px solid var(--line2);background:var(--surf2);
+  color:var(--fg2);font-family:'Inter',sans-serif;
+  font-size:11px;font-weight:500;cursor:pointer;
+  display:flex;align-items:center;gap:5px;
+  transition:all .13s;white-space:nowrap}
+.tb-btn:hover{background:var(--hover);color:var(--hi);border-color:var(--line2)}
+.tb-btn:active{transform:scale(.96)}
+.tb-btn-exec:hover{border-color:rgba(137,180,250,.3);color:var(--blue)}
+.tb-btn-inject{background:linear-gradient(135deg,var(--pk2) 0%,#7c3aed 100%);
+  border:1px solid rgba(192,132,252,.4);color:#fff;font-weight:600;
+  box-shadow:0 2px 14px rgba(168,85,247,.3)}
+.tb-btn-inject:hover{filter:brightness(1.12);
+  box-shadow:0 2px 20px rgba(168,85,247,.5);color:#fff;background:linear-gradient(135deg,var(--pk2) 0%,#7c3aed 100%)}
+.tb-btn-inject.busy{animation:glowInject 1.1s ease-in-out infinite}
+.tb-btn-inject:disabled{opacity:.5;cursor:not-allowed;filter:none}
+.tb-icon-btn{width:28px;height:28px;border-radius:var(--r);
+  border:1px solid var(--line2);background:var(--surf2);
+  color:var(--fg3);cursor:pointer;display:flex;align-items:center;
+  justify-content:center;transition:all .12s}
+.tb-icon-btn:hover{background:var(--hover);color:var(--fg2)}
+.tb-icon-btn.danger:hover{border-color:rgba(243,139,168,.3);color:var(--err)}
+
+/* WC */
+.wc{display:flex;gap:6px;margin-left:10px}
+.wc button{width:12px;height:12px;border-radius:50%;border:none;cursor:pointer;transition:filter .12s}
+.wc button:hover{filter:brightness(1.3)}
+.wc-min{background:#febc2e}.wc-max{background:#28c840}.wc-cls{background:#ff5f57}
+
+/* ═══ ICON RAIL ═══════════════════════════════ */
+.rail-item{width:30px;height:30px;border-radius:var(--r);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--fg4);cursor:pointer;border:1px solid transparent;
+  transition:all .13s;position:relative}
+.rail-item:hover{background:var(--hover);color:var(--fg2);border-color:var(--line2)}
+.rail-item.active{background:var(--pk-glow);border-color:var(--pk-border);color:var(--pk)}
+.rail-item.active::before{content:'';position:absolute;right:-1px;top:50%;
+  transform:translateY(-50%);width:2px;height:14px;
+  background:var(--pk);border-radius:2px 0 0 2px}
+.rail-spacer{flex:1}
+
+/* ═══ SIDEBAR ═══════════════════════════════ */
+.sb-panel{display:none;flex:1;flex-direction:column;overflow:hidden}
+.sb-panel.active{display:flex}
+.sb-top{height:36px;flex-shrink:0;display:flex;align-items:center;
+  padding:0 12px;gap:8px;border-bottom:1px solid var(--line)}
+.sb-label{font-size:9px;font-weight:700;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--fg3);flex:1}
+.sb-action{width:20px;height:20px;border-radius:5px;border:1px solid transparent;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--fg3);cursor:pointer;transition:all .1s}
+.sb-action:hover{background:var(--hover);border-color:var(--line2);color:var(--fg2)}
+
+/* Search */
+.sb-search{padding:7px 8px;border-bottom:1px solid var(--line);flex-shrink:0;position:relative}
+.sb-search input{width:100%;height:25px;background:var(--surf2);
+  border:1px solid var(--line2);border-radius:var(--r);
+  padding:0 8px 0 27px;font-family:'Inter',sans-serif;font-size:11px;
+  color:var(--fg);outline:none;transition:border-color .13s}
+.sb-search input::placeholder{color:var(--fg3)}
+.sb-search input:focus{border-color:var(--pk-border)}
+.sb-search-ico{position:absolute;left:15px;top:50%;transform:translateY(-50%);
+  color:var(--fg4);pointer-events:none}
+
+/* File tree */
+#ws-body{flex:1;overflow-y:auto;padding:5px 0}
+#ws-body::-webkit-scrollbar{width:3px}
+#ws-body::-webkit-scrollbar-thumb{background:var(--line2);border-radius:2px}
+.ws-empty{padding:26px 14px;text-align:center;color:var(--fg4);
+  font-size:11px;line-height:17px;font-style:italic}
+.ws-file{display:flex;align-items:center;gap:7px;padding:5px 12px;
+  cursor:pointer;transition:background .1s;min-width:0}
+.ws-file:hover{background:var(--hover)}
+.ws-file.active{background:var(--pk-glow)}
+.ws-file-ico{flex-shrink:0;color:var(--fg4);transition:color .1s}
+.ws-file:hover .ws-file-ico{color:var(--fg3)}
+.ws-file.active .ws-file-ico{color:var(--pk)}
+.ws-fname{flex:1;font-size:11px;color:var(--fg2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws-file:hover .ws-fname{color:var(--fg)}
+.ws-file.active .ws-fname{color:var(--pk3)}
+.ws-del{flex-shrink:0;width:14px;height:14px;border-radius:3px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;color:var(--fg4);opacity:0;transition:all .1s}
+.ws-file:hover .ws-del{opacity:1}
+.ws-del:hover{background:rgba(243,139,168,.12);color:var(--err)}
+
+/* Settings */
+.s-section{margin-bottom:18px;padding:10px 10px 0}
+.s-head{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--fg3);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.s-head::after{content:'';flex:1;height:1px;background:var(--line)}
+.s-row{display:flex;align-items:center;gap:10px;padding:8px 10px;
+  border-radius:var(--r);background:var(--surf2);margin-bottom:4px;
+  border:1px solid transparent;transition:all .12s}
+.s-row:hover{border-color:var(--line2);background:var(--hover)}
+.s-info{flex:1}
+.s-label{font-size:11px;font-weight:500;color:var(--fg)}
+.s-sub{font-size:9.5px;color:var(--fg3);margin-top:1px}
+.tog{width:30px;height:16px;border-radius:8px;background:var(--line2);
+  border:none;cursor:pointer;position:relative;flex-shrink:0;transition:background .17s}
+.tog.on{background:var(--pk2)}
+.tog::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;
+  border-radius:50%;background:#fff;transition:transform .17s;
+  box-shadow:0 1px 3px rgba(0,0,0,.5)}
+.tog.on::after{transform:translateX(14px)}
+
+/* Colors */
+#color-panel{flex:1;overflow-y:auto;padding:10px}
+#color-panel::-webkit-scrollbar{width:3px}
+#color-panel::-webkit-scrollbar-thumb{background:var(--line2);border-radius:2px}
+.c-item{display:flex;align-items:center;padding:7px 10px;border-radius:var(--r);
+  background:var(--surf2);margin-bottom:4px;border:1px solid transparent;
+  transition:all .12s;gap:10px}
+.c-item:hover{border-color:var(--line2)}
+.c-info{flex:1}
+.c-lbl{font-size:11px;font-weight:500;color:var(--fg)}
+.c-sub{font-size:9.5px;color:var(--fg3);margin-top:1px}
+.c-swatch{width:26px;height:26px;border-radius:5px;border:1px solid var(--line2);
+  cursor:pointer;overflow:hidden;position:relative;flex-shrink:0;transition:transform .12s}
+.c-swatch:hover{transform:scale(1.1)}
+.c-swatch-bg{position:absolute;inset:0;pointer-events:none}
+.c-swatch input{position:absolute;inset:-4px;width:calc(100%+8px);height:calc(100%+8px);
+  cursor:pointer;opacity:0;border:none;padding:0}
+.c-preview-wrap{margin-top:8px;padding:11px 12px;border-radius:var(--r);
+  border:1px solid var(--line);background:var(--bg);
+  font-family:'JetBrains Mono',monospace;font-size:11px;line-height:20px}
+.c-btns{display:flex;gap:6px;margin-top:10px}
+.c-btn{flex:1;height:27px;border-radius:var(--r);border:1px solid var(--line2);
+  background:var(--surf2);color:var(--fg2);font-family:'Inter',sans-serif;
+  font-size:11px;font-weight:500;cursor:pointer;transition:all .12s}
+.c-btn:hover{background:var(--hover);color:var(--hi)}
+.c-btn.apply{background:linear-gradient(135deg,var(--pk2),#7c3aed);
+  border:none;color:#fff;font-weight:600}
+.c-btn.apply:hover{filter:brightness(1.1)}
+
+/* ═══ EDITOR AREA ═══════════════════════════════ */
+/* Script tabs */
+#tabs-bar{height:34px;flex-shrink:0;display:flex;align-items:center;
+  background:var(--surf);border-bottom:1px solid var(--line);overflow-x:auto;overflow-y:hidden}
+#tabs-bar::-webkit-scrollbar{height:0}
+.tab{height:34px;padding:0 12px;display:flex;align-items:center;gap:6px;
+  font-size:11px;color:var(--fg3);cursor:pointer;
+  border-right:1px solid var(--line);white-space:nowrap;
+  flex-shrink:0;max-width:150px;position:relative;transition:color .1s,background .1s}
+.tab:hover{background:var(--hover);color:var(--fg2)}
+.tab.active{background:var(--bg);color:var(--fg)}
+.tab.active::after{content:'';position:absolute;top:0;left:0;right:0;
+  height:1.5px;background:var(--pk)}
+.tab-ico{flex-shrink:0;opacity:.5}
+.tab.active .tab-ico{opacity:1;color:var(--pk)}
+.tab-lbl{flex:1;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.tab-x{flex-shrink:0;width:14px;height:14px;border-radius:3px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;color:var(--fg3);opacity:0;transition:all .1s}
+.tab:hover .tab-x{opacity:1}
+.tab-x:hover{background:rgba(243,139,168,.14);color:var(--err)}
+.tab-add{width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;
+  justify-content:center;font-size:16px;color:var(--fg4);cursor:pointer;
+  border-right:1px solid var(--line);transition:all .1s}
+.tab-add:hover{background:var(--hover);color:var(--pk)}
+
+/* Monaco */
+#ed{flex:1;overflow:hidden;position:relative;background:var(--bg)}
+
+/* Resizer */
+#resizer{height:3px;flex-shrink:0;background:var(--line);cursor:ns-resize;transition:background .12s}
+#resizer:hover,#resizer.dragging{background:var(--pk)}
+
+/* Console */
+#console{height:150px;flex-shrink:0;display:flex;flex-direction:column}
+.con-header{height:30px;flex-shrink:0;display:flex;align-items:center;
+  gap:5px;padding:0 10px;background:var(--surf);
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.con-tab{height:20px;padding:0 9px;border-radius:var(--r);font-size:10px;
+  font-weight:500;letter-spacing:.04em;color:var(--fg3);cursor:pointer;
+  display:flex;align-items:center;gap:5px;transition:all .1s;border:1px solid transparent}
+.con-tab:hover{background:var(--hover);color:var(--fg2)}
+.con-tab.active{background:var(--surf2);color:var(--fg);border-color:var(--line2)}
+.con-tab-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.con-gap{flex:1}
+.con-tools{display:flex;align-items:center;gap:5px}
+.con-search-wrap{display:flex;align-items:center;gap:5px;padding:3px 8px;
+  background:var(--surf2);border:1px solid var(--line2);border-radius:var(--r);
+  font-size:11px;color:var(--fg3)}
+.con-search-wrap input{background:none;border:none;outline:none;
+  font-family:'Inter',sans-serif;font-size:11px;color:var(--fg);width:110px}
+.con-search-wrap input::placeholder{color:var(--fg3)}
+.con-icon-btn{width:20px;height:20px;border-radius:4px;display:flex;align-items:center;
+  justify-content:center;color:var(--fg3);cursor:pointer;transition:all .1s}
+.con-icon-btn:hover{background:var(--hover);color:var(--fg2)}
+#log-body{flex:1;overflow-y:auto;padding:4px 13px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;line-height:19px;
+  background:var(--bg)}
+#log-body::-webkit-scrollbar{width:3px}
+#log-body::-webkit-scrollbar-thumb{background:var(--line2);border-radius:2px}
+.lr{display:flex;gap:10px;align-items:baseline;animation:fadeUp .12s ease}
+.lr-ts{color:var(--fg4);font-size:10px;flex-shrink:0}
+.lr-tag{font-weight:600;flex-shrink:0;min-width:52px}
+.lr-msg{color:var(--fg2)}
+.c-ok{color:var(--ok)}.c-err{color:var(--err)}.c-warn{color:var(--warn)}
+.c-sys{color:var(--pk)}.c-info{color:var(--blue)}
+
+/* ═══ STATUSBAR ═══════════════════════════════ */
+.sb-seg{display:flex;align-items:center;gap:5px;padding:0 9px;
+  font-family:'JetBrains Mono',monospace;font-size:10px;
+  color:var(--fg3);height:100%;white-space:nowrap;cursor:default;
+  border-right:1px solid var(--line);transition:all .1s}
+.sb-seg:first-child{border-left:none}
+.sb-seg:hover{color:var(--fg2);background:var(--hover)}
+.sb-seg .dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.sb-gap{flex:1;border-right:none !important;pointer-events:none}
+.sb-ae{cursor:pointer}
+.sb-ae.on{color:var(--pk);background:var(--pk-glow)}
+.sb-ae.on .dot{background:var(--pk);box-shadow:0 0 5px var(--pk)}
+
+/* ═══ SCRIPT HUB ═══════════════════════════════ */
+#panel-hub{flex-direction:column}
+.hub-top{height:36px;flex-shrink:0;display:flex;align-items:center;
+  padding:0 12px;gap:6px;border-bottom:1px solid var(--line)}
+.hub-search-bar{padding:7px 8px;border-bottom:1px solid var(--line);flex-shrink:0;
+  display:flex;gap:5px}
+.hub-search-wrap{flex:1;position:relative;display:flex;align-items:center}
+.hub-search-wrap svg{position:absolute;left:8px;color:var(--fg4);pointer-events:none}
+.hub-search-wrap input{width:100%;height:25px;background:var(--surf2);
+  border:1px solid var(--line2);border-radius:var(--r);
+  padding:0 8px 0 26px;font-family:'Inter',sans-serif;font-size:11px;
+  color:var(--fg);outline:none;transition:border-color .13s}
+.hub-search-wrap input::placeholder{color:var(--fg3)}
+.hub-search-wrap input:focus{border-color:var(--pk-border)}
+.hub-filter-btn{height:25px;padding:0 9px;border-radius:var(--r);
+  border:1px solid var(--line2);background:var(--surf2);
+  font-family:'Inter',sans-serif;font-size:10px;font-weight:500;
+  color:var(--fg3);cursor:pointer;transition:all .12s;white-space:nowrap}
+.hub-filter-btn:hover{border-color:var(--pk-border);color:var(--pk3)}
+.hub-filter-btn.on{background:var(--pk-glow);border-color:var(--pk-border);color:var(--pk3)}
+.hub-tabs{display:flex;gap:1px;padding:5px 8px;flex-shrink:0;
+  border-bottom:1px solid var(--line)}
+.hub-tab{flex:1;height:23px;border-radius:var(--r);display:flex;align-items:center;
+  justify-content:center;font-size:10px;font-weight:500;letter-spacing:.03em;
+  color:var(--fg3);cursor:pointer;transition:all .12s;border:1px solid transparent}
+.hub-tab:hover{background:var(--hover);color:var(--fg2)}
+.hub-tab.active{background:var(--surf2);border-color:var(--line2);color:var(--fg)}
+#hub-list{flex:1;overflow-y:auto;padding:5px 0}
+#hub-list::-webkit-scrollbar{width:3px}
+#hub-list::-webkit-scrollbar-thumb{background:var(--line2);border-radius:2px}
+.hub-card{display:flex;flex-direction:column;margin:3px 7px;
+  border:1px solid var(--line);border-radius:var(--r2);
+  background:var(--surf2);overflow:hidden;transition:all .13s;cursor:default}
+.hub-card:hover{border-color:var(--line2);background:var(--hover)}
+.hub-card-img{width:100%;height:72px;object-fit:cover;display:block;
+  background:var(--surf3);flex-shrink:0}
+.hub-card-img-placeholder{width:100%;height:72px;background:linear-gradient(135deg,var(--surf3),var(--active));
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.hub-card-body{padding:8px 10px 6px}
+.hub-card-title{font-size:11.5px;font-weight:600;color:var(--hi);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.hub-card-game{font-size:10px;color:var(--fg3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:5px}
+.hub-card-badges{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
+.hub-badge{font-size:9px;font-weight:600;letter-spacing:.04em;padding:2px 6px;
+  border-radius:10px;border:1px solid transparent}
+.hub-badge.verified{background:rgba(166,227,161,.1);border-color:rgba(166,227,161,.25);color:var(--ok)}
+.hub-badge.universal{background:rgba(137,180,250,.1);border-color:rgba(137,180,250,.25);color:var(--blue)}
+.hub-badge.patched{background:rgba(243,139,168,.1);border-color:rgba(243,139,168,.25);color:var(--err)}
+.hub-badge.key{background:rgba(249,226,175,.1);border-color:rgba(249,226,175,.25);color:var(--warn)}
+.hub-card-views{font-size:9.5px;color:var(--fg3);margin-bottom:7px}
+.hub-card-actions{display:flex;gap:5px}
+.hub-card-btn{flex:1;height:24px;border-radius:var(--r);
+  border:1px solid var(--line2);background:transparent;
+  font-family:'Inter',sans-serif;font-size:10px;font-weight:500;
+  color:var(--fg2);cursor:pointer;transition:all .12s;
+  display:flex;align-items:center;justify-content:center;gap:4px}
+.hub-card-btn:hover{background:var(--hover);color:var(--hi);border-color:var(--line2)}
+.hub-card-btn.exec{background:var(--pk-glow);border-color:var(--pk-border);color:var(--pk3)}
+.hub-card-btn.exec:hover{background:rgba(168,85,247,.22);color:var(--hi)}
+.hub-empty{padding:28px 16px;text-align:center;color:var(--fg4);
+  font-size:11px;line-height:17px;font-style:italic}
+.hub-loading{display:flex;align-items:center;justify-content:center;
+  padding:30px;color:var(--fg3);gap:8px;font-size:11px}
+.hub-spinner{width:14px;height:14px;border:2px solid var(--line2);
+  border-top-color:var(--pk);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+.hub-pager{display:flex;align-items:center;justify-content:space-between;
+  padding:7px 10px;border-top:1px solid var(--line);flex-shrink:0}
+.hub-page-btn{height:22px;padding:0 10px;border-radius:var(--r);
+  border:1px solid var(--line2);background:transparent;
+  font-family:'Inter',sans-serif;font-size:10px;font-weight:500;
+  color:var(--fg2);cursor:pointer;transition:all .12s}
+.hub-page-btn:hover:not(:disabled){border-color:var(--pk-border);color:var(--pk3)}
+.hub-page-btn:disabled{opacity:.35;cursor:not-allowed}
+.hub-page-info{font-size:10px;color:var(--fg3)}
+.hub-attr{padding:5px 10px;text-align:center;font-size:9px;color:var(--fg4);
+  border-top:1px solid var(--line);flex-shrink:0}
+.hub-attr a{color:var(--fg3);text-decoration:none}
+.hub-attr a:hover{color:var(--pk3)}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:none}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.1}}
+@keyframes glowInject{0%,100%{box-shadow:0 2px 14px rgba(168,85,247,.3)}
+  50%{box-shadow:0 2px 24px rgba(168,85,247,.65)}}
+@keyframes dropIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="root">
+
+<!-- ══ TITLEBAR ══════════════════════════════════════════════════ -->
+<div id="titlebar" onmousedown="drag(event)">
+  <div class="tb-brand">
+    <div class="tb-logo">
+      <svg viewBox="0 0 14 14" fill="none"><path d="M3 11L7 3L11 11" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 8.5H9.5" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity=".7"/></svg>
+    </div>
+    <span class="tb-name">Versal</span>
+  </div>
+  <div class="tb-divider"></div>
+
+  <!-- Process / Target selector -->
+  <div class="tb-target" id="tb-target" onclick="toggleProcDropdown()">
+    <div class="tb-target-left">
+      <div class="tb-target-key">TARGET</div>
+      <div class="tb-target-val none" id="tb-target-val">Select process…</div>
+    </div>
+    <svg class="tb-caret" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6,9 12,15 18,9"/></svg>
+
+    <!-- Dropdown (inside .tb-target for positioning) -->
+    <div id="proc-dropdown">
+      <div class="proc-header">Open Roblox Instances</div>
+      <div class="proc-list" id="proc-list">
+        <div class="proc-empty" id="proc-empty">Scanning for Roblox…</div>
+      </div>
+      <div class="proc-footer">
+        <button class="proc-refresh" onclick="refreshProcs(event)">
+          <svg id="refresh-ico" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+          Refresh
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tb-gap"></div>
+
+  <!-- Status pill -->
+  <div class="tb-pill editing" id="tb-pill">
+    <div class="pdot"></div>
+    <span id="tb-pill-txt">Ready</span>
+  </div>
+
+  <!-- Action buttons -->
+  <div class="tb-actions">
+    <button class="tb-btn tb-btn-exec" onclick="doExec()">
+      <svg width="9" height="9" fill="currentColor" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+      Execute
+    </button>
+    <button class="tb-btn tb-btn-inject" id="btn-inject" onclick="doInject()">
+      <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10,17 15,12 10,7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+      Inject
+    </button>
+    <div class="tb-divider"></div>
+    <div class="tb-icon-btn" onclick="send('ACTION:SAVE:'+val())" title="Save script">
+      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17,21 17,13 7,13"/><polyline points="7,3 7,8 15,8"/></svg>
+    </div>
+    <div class="tb-icon-btn" onclick="send('ACTION:OPEN_FILE')" title="Open file">
+      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+    </div>
+    <div class="tb-icon-btn danger" onclick="send('ACTION:KILL')" title="Kill Roblox">
+      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+    </div>
+  </div>
+  <div class="wc">
+    <button class="wc-min" onclick="send('ACTION:MINIMIZE')"></button>
+    <button class="wc-max" onclick="send('ACTION:MAXIMIZE')"></button>
+    <button class="wc-cls" onclick="send('ACTION:CLOSE')"></button>
+  </div>
+</div>
+
+<!-- ══ BODY ═════════════════════════════════════════════════════ -->
+<div id="body">
+
+  <!-- Icon Rail -->
+  <div id="rail">
+    <div class="rail-item active" id="rail-ws" onclick="railSwitch('ws')" title="Workspace">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+    </div>
+    <div class="rail-item" id="rail-settings" onclick="railSwitch('settings')" title="Settings">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </div>
+    <div class="rail-item" id="rail-colors" onclick="railSwitch('colors')" title="Colors">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+    </div>
+    <div class="rail-item" id="rail-hub" onclick="railSwitch('hub')" title="Script Hub">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    </div>
+    <div class="rail-spacer"></div>
+  </div>
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+
+    <!-- Workspace panel -->
+    <div class="sb-panel active" id="panel-ws">
+      <div class="sb-top">
+        <span class="sb-label">Workspace</span>
+        <div class="sb-action" onclick="send('ACTION:OPEN_FILE')" title="Open file">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </div>
+      </div>
+      <div class="sb-search">
+        <svg class="sb-search-ico" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" placeholder="Search scripts…" oninput="filterWs(this.value)">
+      </div>
+      <div id="ws-body">
+        <div class="ws-empty" id="ws-empty">No scripts yet.<br>Save a script to see it here.</div>
+      </div>
+    </div>
+
+    <!-- Settings panel -->
+    <div class="sb-panel" id="panel-settings">
+      <div class="sb-top"><span class="sb-label">Settings</span></div>
+      <div style="flex:1;overflow-y:auto">
+        <div class="s-section">
+          <div class="s-head">Executor</div>
+          <div class="s-row"><div class="s-info"><div class="s-label">Auto Attach</div><div class="s-sub">Attach when Roblox opens</div></div><button class="tog" id="tog-autoattach" onclick="toggleSetting('autoattach',this)"></button></div>
+          <div class="s-row"><div class="s-info"><div class="s-label">Always on Top</div><div class="s-sub">Float above all windows</div></div><button class="tog" id="tog-ontop" onclick="toggleSetting('ontop',this)"></button></div>
+        </div>
+        <div class="s-section">
+          <div class="s-head">Editor</div>
+          <div class="s-row"><div class="s-info"><div class="s-label">Minimap</div><div class="s-sub">Code overview on right</div></div><button class="tog" id="tog-minimap" onclick="toggleSetting('minimap',this)"></button></div>
+          <div class="s-row"><div class="s-info"><div class="s-label">Word Wrap</div><div class="s-sub">Wrap long lines</div></div><button class="tog" id="tog-wordwrap" onclick="toggleSetting('wordwrap',this)"></button></div>
+          <div class="s-row"><div class="s-info"><div class="s-label">Ligatures</div><div class="s-sub">Combined glyph characters</div></div><button class="tog on" id="tog-ligatures" onclick="toggleSetting('ligatures',this)"></button></div>
+          <div class="s-row"><div class="s-info"><div class="s-label">Smooth Scroll</div><div class="s-sub">Animated scrolling</div></div><button class="tog on" id="tog-smooth" onclick="toggleSetting('smooth',this)"></button></div>
+          <div class="s-row"><div class="s-info"><div class="s-label">Bracket Colors</div><div class="s-sub">Colorize bracket pairs</div></div><button class="tog on" id="tog-brackets" onclick="toggleSetting('brackets',this)"></button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Colors panel -->
+    <div class="sb-panel" id="panel-colors">
+      <div class="sb-top"><span class="sb-label">Theme Colors</span></div>
+      <div id="color-panel">
+        <div id="color-grid"></div>
+        <div class="c-preview-wrap" id="c-preview"></div>
+        <div class="c-btns" style="margin-top:10px">
+          <button class="c-btn" onclick="resetColors()">Reset</button>
+          <button class="c-btn apply" onclick="applyColors()">Apply</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hub panel -->
+    <div class="sb-panel" id="panel-hub">
+      <div class="hub-top">
+        <span class="sb-label">Script Hub</span>
+      </div>
+      <div class="hub-tabs">
+        <div class="hub-tab active" id="htab-trending" onclick="hubTab('trending')">Trending</div>
+        <div class="hub-tab" id="htab-recent" onclick="hubTab('recent')">Recent</div>
+        <div class="hub-tab" id="htab-search" onclick="hubTab('search')">Search</div>
+      </div>
+      <div class="hub-search-bar" id="hub-search-bar" style="display:none">
+        <div class="hub-search-wrap">
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="hub-q" placeholder="Search scripts…" onkeydown="if(event.key==='Enter')hubSearch()">
+        </div>
+        <button class="hub-filter-btn" id="hub-verified-btn" onclick="toggleHubVerified()">✓ Verified</button>
+      </div>
+      <div id="hub-list"><div class="hub-loading"><div class="hub-spinner"></div>Loading…</div></div>
+      <div class="hub-pager" id="hub-pager" style="display:none">
+        <button class="hub-page-btn" id="hub-prev" onclick="hubPage(-1)" disabled>← Prev</button>
+        <span class="hub-page-info" id="hub-page-info">1 / 1</span>
+        <button class="hub-page-btn" id="hub-next" onclick="hubPage(1)">Next →</button>
+      </div>
+      <div class="hub-attr">Powered by <a href="#">ScriptBlox.com</a></div>
+    </div>
+
+  </div>
+  <div id="editor-wrap">
+    <!-- Script tabs -->
+    <div id="tabs-bar">
+      <div class="tab-add" onclick="newTab()">+</div>
+    </div>
+    <!-- Monaco -->
+    <div id="ed"></div>
+    <!-- Resizer -->
+    <div id="resizer"></div>
+    <!-- Console -->
+    <div id="console">
+      <div class="con-header">
+        <div class="con-tab active" id="ctab-log">
+          <div class="con-tab-dot" style="background:var(--pk);box-shadow:0 0 5px var(--pk)"></div>
+          Versal Logs
+        </div>
+        <div class="con-gap"></div>
+        <div class="con-tools">
+          <div class="con-search-wrap">
+            <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" placeholder="Filter logs…" oninput="filterLog(this.value)">
+          </div>
+          <div class="con-icon-btn" onclick="clrLog()" title="Clear">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="3,6 5,6 21,6"/><path d="M19,6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+          </div>
+        </div>
+      </div>
+      <div id="log-body"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ STATUSBAR ═════════════════════════════════════════════════ -->
+<div id="statusbar">
+  <div class="sb-seg" id="sb-script">
+    <svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+    <span id="sb-script-txt">untitled</span>
+  </div>
+  <div class="sb-seg">Luau</div>
+  <div class="sb-seg" id="sb-cursor">1 : 1</div>
+  <div class="sb-seg sb-gap"></div>
+  <div class="sb-seg sb-ae" id="sb-ae" onclick="toggleAutoExec()">
+    <div class="dot" style="background:var(--fg4)"></div>
+    auto-exec
+  </div>
+  <div class="sb-seg" id="sb-status">
+    <div class="dot" style="background:var(--fg4)" id="sb-dot"></div>
+    <span id="sb-status-txt">ready</span>
+  </div>
+</div>
+
+</div><!-- #root -->
+
+<script>
+// ─── Bridge ──────────────────────────────────────────────────────
+function send(m){try{window.chrome.webview.postMessage(m);}catch(_){}}
+function drag(e){
+  if(e.target.closest('.tb-btn,.tb-icon-btn,.tb-target,.tb-pill,.wc,.tog'))return;
+  if(e.button!==0)return;
+  send('ACTION:DRAG_START');
+}
+
+// ─── Process / Target selector ───────────────────────────────────
+var selectedPid=null;
+var selectedTitle='';
+var procOpen=false;
+
+function toggleProcDropdown(){
+  procOpen=!procOpen;
+  var dd=document.getElementById('proc-dropdown');
+  var tgt=document.getElementById('tb-target');
+  dd.classList.toggle('open',procOpen);
+  tgt.classList.toggle('open',procOpen);
+  if(procOpen) refreshProcs();
+}
+
+function refreshProcs(e){
+  if(e){e.stopPropagation();}
+  var ico=document.getElementById('refresh-ico');
+  ico.style.animation='spin .6s linear infinite';
+  document.getElementById('proc-list').innerHTML=
+    '<div class="proc-empty">Scanning…</div>';
+  send('ACTION:GET_PROCESSES');
+  setTimeout(function(){ico.style.animation='';},700);
+}
+
+function receiveProcesses(procs){
+  var list=document.getElementById('proc-list');
+  list.innerHTML='';
+  if(!procs||procs.length===0){
+    list.innerHTML='<div class="proc-empty">No Roblox instances found.<br>Open Roblox and refresh.</div>';
+    return;
+  }
+  procs.forEach(function(p){
+    var el=document.createElement('div');
+    el.className='proc-item'+(p.pid===selectedPid?' selected':'');
+    el.innerHTML=
+      '<div class="proc-dot"></div>'
+      +'<div class="proc-info">'
+      +'<div class="proc-name">'+esc(p.title||'Roblox')+'</div>'
+      +'<div class="proc-pid">PID '+p.pid+'</div>'
+      +'</div>';
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      selectProc(p.pid,p.title||'Roblox');
+    });
+    list.appendChild(el);
+  });
+}
+
+function selectProc(pid,title){
+  selectedPid=pid;
+  selectedTitle=title;
+  var tv=document.getElementById('tb-target-val');
+  tv.textContent=title+' · '+pid;
+  tv.classList.remove('none');
+  // close dropdown
+  procOpen=false;
+  document.getElementById('proc-dropdown').classList.remove('open');
+  document.getElementById('tb-target').classList.remove('open');
+  log('[SYS]','Target → '+title+' (PID '+pid+')','c-sys');
+}
+
+// close dropdown when clicking elsewhere
+document.addEventListener('click',function(e){
+  if(!e.target.closest('#tb-target')){
+    procOpen=false;
+    document.getElementById('proc-dropdown').classList.remove('open');
+    document.getElementById('tb-target').classList.remove('open');
+  }
+});
+
+// ─── Inject ───────────────────────────────────────────────────────
+function doInject(){
+  if(!selectedPid){
+    // open the picker instead
+    toggleProcDropdown();
+    log('[WARN]','Select a Roblox process first.','c-warn');
+    return;
+  }
+  send('ACTION:INJECT');
+}
+
+// ─── Tab system ───────────────────────────────────────────────────
+var tabs={},activeTabId=null,tabCounter=0;
+
+function createTab(label,content){
+  tabCounter++;
+  var id='t'+tabCounter;
+  tabs[id]={label:label||'Untitled',content:content||'-- Versal Executor\n\n'};
+  var bar=document.getElementById('tabs-bar');
+  var add=bar.querySelector('.tab-add');
+  var el=document.createElement('div');
+  el.className='tab';el.dataset.id=id;
+  el.innerHTML=
+    '<svg class="tab-ico" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>'
+    +'<span class="tab-lbl">'+esc(tabs[id].label)+'</span>'
+    +'<div class="tab-x" onclick="closeTab(event,this)">×</div>';
+  el.addEventListener('click',function(e){
+    if(e.target.classList.contains('tab-x'))return;
+    switchTab(id);
+  });
+  bar.insertBefore(el,add);
+  switchTab(id);
+}
+
+function switchTab(id){
+  if(activeTabId&&tabs[activeTabId]&&ed)
+    tabs[activeTabId].content=ed.getValue();
+  activeTabId=id;
+  document.querySelectorAll('.tab').forEach(function(t){
+    t.classList.toggle('active',t.dataset.id===id);
+  });
+  if(ed&&tabs[id]){ed.setValue(tabs[id].content);ed.setScrollPosition({scrollTop:0});}
+  document.getElementById('sb-script-txt').textContent=(tabs[id]?tabs[id].label:'Untitled').toLowerCase();
+}
+
+function newTab(){createTab('Untitled','-- Versal Executor\n\n');}
+
+function closeTab(e,btn){
+  e.stopPropagation();
+  var tab=btn.closest('.tab'),id=tab.dataset.id;
+  if(document.querySelectorAll('.tab').length<=1)return;
+  var wasActive=tab.classList.contains('active');
+  if(wasActive){
+    var p=tab.previousElementSibling,n=tab.nextElementSibling;
+    var s=(p&&p.classList.contains('tab'))?p:(n&&n.classList.contains('tab'))?n:null;
+    if(s)switchTab(s.dataset.id);
+  }
+  delete tabs[id];tab.remove();
+}
+
+// ─── Rail / Sidebar ───────────────────────────────────────────────
+function railSwitch(id){
+  document.querySelectorAll('.rail-item').forEach(function(r){r.classList.remove('active')});
+  document.getElementById('rail-'+id).classList.add('active');
+  document.querySelectorAll('.sb-panel').forEach(function(p){p.classList.remove('active')});
+  document.getElementById('panel-'+id).classList.add('active');
+  if(id==='colors'){renderColorGrid();renderPreview();}
+  if(id==='hub'&&!_hubLoaded){_hubLoaded=true;hubLoad();}
+}
+
+// ─── Script Hub ───────────────────────────────────────────────────
+var _hubLoaded=false;
+var _hubMode='trending'; // 'trending' | 'recent' | 'search'
+var _hubPage=1;
+var _hubTotalPages=1;
+var _hubVerified=false;
+var _hubQuery='';
+
+// Multiple CORS proxies to try in order
+var PROXIES=[
+  'https://corsproxy.io/?',
+  'https://api.allorigins.win/raw?url=',
+  'https://cors-anywhere.herokuapp.com/',
+];
+var _proxyIdx=0;
+
+function hubFetch(url){
+  var proxy=PROXIES[_proxyIdx];
+  var full=proxy+(proxy.endsWith('?')||proxy.endsWith('=')?'':'')+encodeURIComponent(url);
+  if(proxy==='https://cors-anywhere.herokuapp.com/')full=proxy+url;
+  return fetch(full,{headers:{'X-Requested-With':'XMLHttpRequest'}})
+    .then(function(r){
+      if(!r.ok)throw new Error(r.status);
+      return r.text();
+    })
+    .then(function(text){
+      try{return JSON.parse(text);}catch(e){
+        // try stripping XSSI prefix
+        return JSON.parse(text.replace(/^\)\]\}',?\n/,''));
+      }
+    })
+    .catch(function(err){
+      // try next proxy
+      if(_proxyIdx<PROXIES.length-1){_proxyIdx++;return hubFetch(url.split('?')[0]+(url.includes('?')?'?'+url.split('?')[1]:''));}
+      throw err;
+    });
+}
+
+function hubFetchRaw(url){
+  var proxy=PROXIES[_proxyIdx];
+  var full=proxy+encodeURIComponent(url);
+  if(proxy==='https://cors-anywhere.herokuapp.com/')full=proxy+url;
+  return fetch(full,{headers:{'X-Requested-With':'XMLHttpRequest'}}).then(function(r){
+    if(!r.ok)throw new Error(r.status);return r.text();
+  });
+}
+
+function hubTab(mode){
+  _hubMode=mode;_hubPage=1;
+  document.querySelectorAll('.hub-tab').forEach(function(t){t.classList.remove('active')});
+  document.getElementById('htab-'+mode).classList.add('active');
+  var sb=document.getElementById('hub-search-bar');
+  sb.style.display=mode==='search'?'flex':'none';
+  if(mode!=='search')hubLoad();
+  else{
+    document.getElementById('hub-list').innerHTML='<div class="hub-empty">Type a game or script name and press Enter.</div>';
+    setTimeout(function(){document.getElementById('hub-q').focus();},50);
+  }
+}
+
+function toggleHubVerified(){
+  _hubVerified=!_hubVerified;
+  document.getElementById('hub-verified-btn').classList.toggle('on',_hubVerified);
+  _hubPage=1;hubLoad();
+}
+
+function hubSearch(){
+  _hubQuery=document.getElementById('hub-q').value.trim();
+  if(!_hubQuery)return;
+  _hubPage=1;hubLoad();
+}
+
+function hubPage(dir){
+  _hubPage=Math.max(1,Math.min(_hubTotalPages,_hubPage+dir));
+  hubLoad();
+}
+
+function hubLoad(){
+  var list=document.getElementById('hub-list');
+  var pager=document.getElementById('hub-pager');
+  list.innerHTML='<div class="hub-loading"><div class="hub-spinner"></div>Loading…</div>';
+  pager.style.display='none';
+
+  var url='';
+  if(_hubMode==='trending'){
+    url='https://scriptblox.com/api/script/trending';
+  } else if(_hubMode==='recent'){
+    url='https://scriptblox.com/api/script/fetch?page='+_hubPage+'&max=10'
+      +(_hubVerified?'&filters=verified':'');
+  } else {
+    if(!_hubQuery){
+      list.innerHTML='<div class="hub-empty">Type a game or script name and press Enter.</div>';
+      return;
+    }
+    url='https://scriptblox.com/api/script/search?q='+encodeURIComponent(_hubQuery)
+      +'&page='+_hubPage+'&max=10'
+      +(_hubVerified?'&filters=verified':'');
+  }
+
+  hubFetch(url)
+    .then(function(data){
+      var scripts=(data.result&&data.result.scripts)?data.result.scripts:[];
+      _hubTotalPages=(data.result&&data.result.totalPages)||1;
+      renderHubScripts(scripts);
+      if(_hubMode!=='trending'&&_hubTotalPages>1){
+        pager.style.display='flex';
+        document.getElementById('hub-page-info').textContent=_hubPage+' / '+_hubTotalPages;
+        document.getElementById('hub-prev').disabled=_hubPage<=1;
+        document.getElementById('hub-next').disabled=_hubPage>=_hubTotalPages;
+      }
+    })
+    .catch(function(){
+      list.innerHTML='<div class="hub-empty">Could not reach ScriptBlox.<br>Check your internet connection.</div>';
+    });
+}
+
+function renderHubScripts(scripts){
+  var list=document.getElementById('hub-list');
+  list.innerHTML='';
+  if(!scripts||!scripts.length){
+    list.innerHTML='<div class="hub-empty">No scripts found.</div>';
+    return;
+  }
+  scripts.forEach(function(s){
+    var card=document.createElement('div');card.className='hub-card';
+    var imgHtml=s.image
+      ?'<img class="hub-card-img" src="'+esc(s.image)+'" loading="lazy" onerror="this.parentNode.replaceChild(Object.assign(document.createElement(\'div\'),{className:\'hub-card-img-placeholder\'}),this)">'
+      :'<div class="hub-card-img-placeholder"><svg width="22" height="22" fill="none" stroke="var(--fg4)" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>';
+    var badges='';
+    if(s.verified)badges+='<span class="hub-badge verified">Verified</span>';
+    if(s.isUniversal)badges+='<span class="hub-badge universal">Universal</span>';
+    if(s.isPatched)badges+='<span class="hub-badge patched">Patched</span>';
+    if(s.key)badges+='<span class="hub-badge key">Key</span>';
+    var game=s.game&&s.game.name?s.game.name:'Unknown game';
+    var slug=s.slug||'';
+    var views=s.views?formatNum(s.views)+' views':'';
+    card.innerHTML=imgHtml
+      +'<div class="hub-card-body">'
+      +'<div class="hub-card-title">'+esc(s.title||'Untitled')+'</div>'
+      +'<div class="hub-card-game">'+esc(game)+'</div>'
+      +(badges?'<div class="hub-card-badges">'+badges+'</div>':'')
+      +(views?'<div class="hub-card-views">'+esc(views)+'</div>':'')
+      +'<div class="hub-card-actions">'
+      +'<button class="hub-card-btn" onclick="hubLoadScript(this,\''+slug.replace(/'/g,"\\'")+'\')">'
+      +'<svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>'
+      +'Load</button>'
+      +'<button class="hub-card-btn exec" onclick="hubExecScript(this,\''+slug.replace(/'/g,"\\'")+'\')">'
+      +'<svg width="9" height="9" fill="currentColor" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>'
+      +'Run</button>'
+      +'</div></div>';
+    list.appendChild(card);
+  });
+}
+
+function _hubGetRaw(slug,cb){
+  hubFetchRaw('https://scriptblox.com/api/script/raw/'+encodeURIComponent(slug))
+    .then(function(t){cb(null,t);}).catch(function(e){cb(e,null);});
+}
+
+function hubLoadScript(btn,slug){
+  if(!slug)return;
+  var orig=btn.innerHTML;btn.disabled=true;btn.innerHTML='…';
+  log('[Hub]','Fetching script…','c-sys');
+  _hubGetRaw(slug,function(err,script){
+    btn.disabled=false;btn.innerHTML=orig;
+    if(err){log('[Hub]','Failed to fetch script.','c-err');return;}
+    loadContent(script,'hub_'+slug+'.lua');
+  });
+}
+
+function hubExecScript(btn,slug){
+  if(!slug)return;
+  var orig=btn.innerHTML;btn.disabled=true;btn.innerHTML='…';
+  log('[Hub]','Fetching & executing…','c-sys');
+  _hubGetRaw(slug,function(err,script){
+    btn.disabled=false;btn.innerHTML=orig;
+    if(err){log('[Hub]','Failed to fetch script.','c-err');return;}
+    send('ACTION:EXECUTE:'+script);
+  });
+}
+
+function formatNum(n){
+  if(n>=1000000)return(n/1000000).toFixed(1)+'M';
+  if(n>=1000)return(n/1000).toFixed(1)+'k';
+  return String(n);
+}
+
+// ─── Monaco ───────────────────────────────────────────────────────
+var ed;
+require.config({paths:{vs:'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs'}});
+require(['vs/editor/editor.main'],function(){
+  defineTheme(currentColors);
+  ed=monaco.editor.create(document.getElementById('ed'),{
+    value:'',language:'lua',theme:'versal',
+    fontSize:13,fontFamily:"'JetBrains Mono','Cascadia Code',Consolas,monospace",
+    fontLigatures:true,lineHeight:22,
+    minimap:{enabled:false},scrollBeyondLastLine:false,smoothScrolling:true,
+    cursorSmoothCaretAnimation:'on',cursorBlinking:'smooth',
+    renderLineHighlight:'line',lineNumbers:'on',lineNumbersMinChars:3,
+    glyphMargin:false,folding:true,wordWrap:'off',tabSize:4,insertSpaces:true,
+    autoIndent:'full',formatOnType:true,
+    bracketPairColorization:{enabled:true},guides:{indentation:true},
+    padding:{top:12,bottom:12},
+    scrollbar:{verticalScrollbarSize:3,horizontalScrollbarSize:3},
+    overviewRulerLanes:0,overviewRulerBorder:false,contextmenu:false,
+    occurrencesHighlight:'off',
+    quickSuggestions:{other:true,comments:false,strings:true},
+    suggestOnTriggerCharacters:true,acceptSuggestionOnEnter:'on',
+    tabCompletion:'on',wordBasedSuggestions:'off',parameterHints:{enabled:true},
+    autoClosingBrackets:'always',autoClosingQuotes:'always',
+    suggest:{showKeywords:true,showSnippets:true,showFunctions:true,
+             showVariables:true,showClasses:true,showModules:true,
+             showProperties:true,showMethods:true,insertMode:'replace'},
+  });
+  new ResizeObserver(function(){ed.layout()}).observe(document.getElementById('ed'));
+  ed.onDidChangeCursorPosition(function(e){
+    document.getElementById('sb-cursor').textContent=e.position.lineNumber+' : '+e.position.column;
+  });
+  registerLuaCompletions();
+  renderColorGrid();renderPreview();
+  createTab('Untitled','-- Versal Executor\n\n');
+  log('[Versal]','Executor ready.','c-sys');
+  log('[System]','Initialized.','c-info');
+});
+
+function val(){return ed?ed.getValue():'';}
+function clrEd(){if(ed){ed.setValue('');if(activeTabId&&tabs[activeTabId])tabs[activeTabId].content='';}}
+
+// ─── Execute ─────────────────────────────────────────────────────
+var autoExec=false;
+function toggleAutoExec(){
+  autoExec=!autoExec;
+  var ae=document.getElementById('sb-ae');
+  ae.classList.toggle('on',autoExec);
+  ae.querySelector('.dot').style.background=autoExec?'var(--pk)':'var(--fg4)';
+  if(autoExec)ae.querySelector('.dot').style.boxShadow='0 0 5px var(--pk)';
+  else ae.querySelector('.dot').style.boxShadow='none';
+}
+
+function doExec(){
+  var s=val();
+  if(!s.trim()){log('[Warn]','Editor is empty.','c-warn');return;}
+  send('ACTION:EXECUTE:'+s);
+}
+
+// ─── Status ───────────────────────────────────────────────────────
+function setAttached(v){
+  var pill=document.getElementById('tb-pill');
+  var ptxt=document.getElementById('tb-pill-txt');
+  var dot=document.getElementById('sb-dot');
+  var stxt=document.getElementById('sb-status-txt');
+  if(v){
+    pill.className='tb-pill attached';ptxt.textContent='Attached';
+    dot.style.cssText='background:var(--ok2);box-shadow:0 0 5px var(--ok2)';
+    stxt.textContent='attached';
+    log('[OK]','Attached to Roblox.','c-ok');
+    if(autoExec){var s=val();if(s.trim())send('ACTION:EXECUTE:'+s);}
+  } else {
+    pill.className='tb-pill editing';ptxt.textContent='Ready';
+    dot.style.cssText='background:var(--fg4)';stxt.textContent='ready';
+  }
+}
+function setInjecting(v){
+  var pill=document.getElementById('tb-pill');
+  var ptxt=document.getElementById('tb-pill-txt');
+  if(v){pill.className='tb-pill injecting';ptxt.textContent='Injecting…';}
+  else{pill.className='tb-pill editing';ptxt.textContent='Ready';}
+  document.getElementById('btn-inject').classList.toggle('busy',v);
+}
+function appendLog(t,m,c){log(t,m,c);}
+
+// ─── Workspace ───────────────────────────────────────────────────
+var _allFiles=[];
+function updateTree(files){_allFiles=files||[];renderTree(_allFiles);}
+function filterWs(q){
+  renderTree(q?_allFiles.filter(function(n){return n.toLowerCase().includes(q.toLowerCase())}):_allFiles);
+}
+function renderTree(files){
+  var body=document.getElementById('ws-body');
+  body.querySelectorAll('.ws-file').forEach(function(el){el.remove();});
+  var empty=document.getElementById('ws-empty');
+  if(!files||!files.length){empty.style.display='';return;}
+  empty.style.display='none';
+  files.forEach(function(name){
+    var row=document.createElement('div');row.className='ws-file';
+    row.innerHTML=
+      '<svg class="ws-file-ico" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>'
+      +'<span class="ws-fname">'+esc(name)+'</span>'
+      +'<div class="ws-del" onclick="wsDel(event,\''+name+'\')">×</div>';
+    row.addEventListener('click',function(e){
+      if(e.target.classList.contains('ws-del'))return;
+      body.querySelectorAll('.ws-file').forEach(function(r){r.classList.remove('active');});
+      row.classList.add('active');
+      send('ACTION:LOAD_SCRIPT:'+name);
+    });
+    body.insertBefore(row,document.getElementById('ws-empty'));
+  });
+}
+function wsDel(e,name){e.stopPropagation();send('ACTION:DEL_SCRIPT:'+name);}
+function loadContent(content,name){
+  if(ed)ed.setValue(content);
+  if(activeTabId&&tabs[activeTabId]){
+    tabs[activeTabId].content=content;tabs[activeTabId].label=name;
+    var lbl=document.querySelector('.tab[data-id="'+activeTabId+'"] .tab-lbl');
+    if(lbl)lbl.textContent=name;
+  }
+  document.getElementById('sb-script-txt').textContent=(name||'untitled').toLowerCase();
+  log('[System]','Loaded: '+name,'c-info');
+}
+
+// ─── Log ─────────────────────────────────────────────────────────
+var _allLogs=[];
+function log(tag,msg,cls){
+  var d=new Date();
+  var ts='['+p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds())+']';
+  _allLogs.push({ts,tag,msg,cls});
+  _appendLogEl(ts,tag,msg,cls);
+}
+function _appendLogEl(ts,tag,msg,cls){
+  var o=document.getElementById('log-body');
+  var el=document.createElement('div');el.className='lr';
+  el.innerHTML='<span class="lr-ts">'+ts+'</span>'
+    +'<span class="lr-tag '+cls+'">'+esc(tag)+'</span>'
+    +'<span class="lr-msg">'+esc(msg)+'</span>';
+  o.appendChild(el);o.scrollTop=o.scrollHeight;
+}
+function clrLog(){document.getElementById('log-body').innerHTML='';_allLogs=[];}
+function filterLog(q){
+  var o=document.getElementById('log-body');o.innerHTML='';
+  (q?_allLogs.filter(function(r){return r.msg.toLowerCase().includes(q.toLowerCase())||r.tag.toLowerCase().includes(q.toLowerCase())}):_allLogs)
+    .forEach(function(r){_appendLogEl(r.ts,r.tag,r.msg,r.cls);});
+}
+function p2(n){return String(n).padStart(2,'0');}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ─── Resizer ─────────────────────────────────────────────────────
+(function(){
+  var rz=false,rY=0,rH=0,el=document.getElementById('resizer');
+  el.addEventListener('mousedown',function(e){
+    rz=true;rY=e.clientY;rH=document.getElementById('console').offsetHeight;
+    el.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',function(e){
+    if(!rz)return;
+    var h=Math.min(Math.max(rH+(rY-e.clientY),50),420);
+    document.getElementById('console').style.height=h+'px';
+    if(ed)ed.layout();
+  });
+  document.addEventListener('mouseup',function(){rz=false;el.classList.remove('dragging');});
+})();
+
+// ─── Settings ────────────────────────────────────────────────────
+var settings={autoattach:false,ontop:false,minimap:false,wordwrap:false,
+              ligatures:true,smooth:true,brackets:true};
+function toggleSetting(key,btn){
+  settings[key]=!settings[key];btn.classList.toggle('on',settings[key]);
+  if(!ed)return;
+  if(key==='minimap')   ed.updateOptions({minimap:{enabled:settings[key]}});
+  if(key==='wordwrap')  ed.updateOptions({wordWrap:settings[key]?'on':'off'});
+  if(key==='ligatures') ed.updateOptions({fontLigatures:settings[key]});
+  if(key==='smooth')    ed.updateOptions({smoothScrolling:settings[key]});
+  if(key==='brackets')  ed.updateOptions({bracketPairColorization:{enabled:settings[key]}});
+  if(key==='autoattach')send('ACTION:AUTO_ATTACH_TOGGLE');
+  if(key==='ontop')     send('ACTION:SET_ALWAYS_ON_TOP:'+(settings[key]?'true':'false'));
+}
+
+// ─── Theme ───────────────────────────────────────────────────────
+var DEFAULT_COLORS={
+  keyword:'c084fc',keyword_ctrl:'d8b4fe',
+  string:'a6e3a1',number:'f9e2af',
+  comment:'3d3d5c',identifier:'89b4fa',
+  operator:'d8b4fe',bracket:'b4befe',
+  bg:'090910',fg:'cdd6f4',
+  linenum:'313244',linenum_active:'7c3aed',cursor:'c084fc',
+  selection:'c084fc2a',gutter:'090910',
+};
+var currentColors=Object.assign({},DEFAULT_COLORS);
+
+function defineTheme(c){
+  monaco.editor.defineTheme('versal',{
+    base:'vs-dark',inherit:true,
+    rules:[
+      {token:'',                  foreground:c.fg},
+      {token:'comment',           foreground:c.comment,fontStyle:'italic'},
+      {token:'keyword',           foreground:c.keyword,fontStyle:'bold'},
+      {token:'keyword.control',   foreground:c.keyword_ctrl,fontStyle:'bold'},
+      {token:'string',            foreground:c.string},
+      {token:'string.escape',     foreground:c.string},
+      {token:'number',            foreground:c.number},
+      {token:'identifier',        foreground:c.identifier},
+      {token:'delimiter.bracket', foreground:c.bracket},
+      {token:'operator',          foreground:c.operator},
+    ],
+    colors:{
+      'editor.background':                    '#'+c.bg,
+      'editor.foreground':                    '#'+c.fg,
+      'editor.lineHighlightBackground':       '#'+c.bg+'80',
+      'editor.selectionBackground':           '#'+c.selection,
+      'editor.inactiveSelectionBackground':   '#'+c.selection.slice(0,6)+'18',
+      'editorLineNumber.foreground':          '#'+c.linenum,
+      'editorLineNumber.activeForeground':    '#'+c.linenum_active,
+      'editorCursor.foreground':              '#'+c.cursor,
+      'editorIndentGuide.background1':        '#1a1a28',
+      'editorIndentGuide.activeBackground1':  '#282840',
+      'scrollbarSlider.background':           '#1a1a2835',
+      'scrollbarSlider.hoverBackground':      '#28284055',
+      'scrollbarSlider.activeBackground':     '#c084fc35',
+      'editorGutter.background':              '#'+c.gutter,
+      'editorBracketMatch.background':        '#c084fc18',
+      'editorBracketMatch.border':            '#c084fc50',
+      'editorWidget.background':              '#0f0f18',
+      'editorWidget.border':                  '#282840',
+      'editorSuggestWidget.background':       '#0f0f18',
+      'editorSuggestWidget.border':           '#282840',
+      'editorSuggestWidget.foreground':       '#cdd6f4',
+      'editorSuggestWidget.highlightForeground':'#c084fc',
+      'editorSuggestWidget.selectedBackground':'#1a1a28',
+      'editorSuggestWidget.selectedForeground':'#f0f0ff',
+      'editorHoverWidget.background':         '#0f0f18',
+      'editorHoverWidget.border':             '#282840',
+      'input.background':                     '#141420',
+      'input.foreground':                     '#cdd6f4',
+      'focusBorder':                          '#a855f7',
+    }
+  });
+  if(ed)monaco.editor.setTheme('versal');
+}
+
+var COLOR_DEFS=[
+  {key:'keyword',       label:'Keyword',         sub:'local function return'},
+  {key:'keyword_ctrl',  label:'Control Keyword',  sub:'if else while for'},
+  {key:'string',        label:'String',           sub:'"hello world"'},
+  {key:'number',        label:'Number',           sub:'42  3.14'},
+  {key:'comment',       label:'Comment',          sub:'-- notes'},
+  {key:'identifier',    label:'Identifier',       sub:'myVariable'},
+  {key:'operator',      label:'Operator',         sub:'+ - * / =='},
+  {key:'bracket',       label:'Bracket',          sub:'( ) { } [ ]'},
+  {key:'fg',            label:'Foreground',       sub:'default text'},
+  {key:'bg',            label:'Background',       sub:'editor bg'},
+  {key:'cursor',        label:'Cursor',           sub:'text cursor'},
+  {key:'linenum',       label:'Line Numbers',     sub:'inactive'},
+  {key:'linenum_active',label:'Active Line No.',  sub:'current line'},
+];
+
+function renderColorGrid(){
+  var grid=document.getElementById('color-grid');if(!grid)return;
+  grid.innerHTML='';
+  COLOR_DEFS.forEach(function(def){
+    var col='#'+currentColors[def.key].slice(0,6);
+    var el=document.createElement('div');el.className='c-item';
+    el.innerHTML='<div class="c-info"><div class="c-lbl">'+def.label+'</div><div class="c-sub">'+def.sub+'</div></div>'
+      +'<div class="c-swatch"><div class="c-swatch-bg" style="background:'+col+'"></div>'
+      +'<input type="color" value="'+col+'" oninput="onColorInput(\''+def.key+'\',this.value,this.parentElement)"></div>';
+    grid.appendChild(el);
+  });
+}
+function onColorInput(key,v,sw){
+  currentColors[key]=v.replace('#','');
+  sw.querySelector('.c-swatch-bg').style.background=v;
+  renderPreview();
+}
+function renderPreview(){
+  var c=currentColors,el=document.getElementById('c-preview');if(!el)return;
+  el.innerHTML='<span style="color:#'+c.comment+'">-- Versal Executor</span>\n'
+    +'<span style="color:#'+c.keyword+'">local</span> <span style="color:#'+c.identifier+'">count</span>'
+    +' <span style="color:#'+c.operator+'">=</span> <span style="color:#'+c.number+'">42</span>\n'
+    +'<span style="color:#'+c.keyword_ctrl+'">if</span> <span style="color:#'+c.identifier+'">count</span>'
+    +' <span style="color:#'+c.operator+'">></span> <span style="color:#'+c.number+'">10</span>'
+    +' <span style="color:#'+c.keyword_ctrl+'">then</span>\n'
+    +'  <span style="color:#'+c.identifier+'">print</span>'
+    +'<span style="color:#'+c.bracket+'">(</span>'
+    +'<span style="color:#'+c.string+'">"hello"</span>'
+    +'<span style="color:#'+c.bracket+'">)</span>\n'
+    +'<span style="color:#'+c.keyword_ctrl+'">end</span>';
+}
+function applyColors(){defineTheme(currentColors);log('[System]','Colors applied.','c-info');}
+function resetColors(){
+  currentColors=Object.assign({},DEFAULT_COLORS);
+  renderColorGrid();renderPreview();defineTheme(currentColors);
+  log('[System]','Colors reset.','c-info');
+}
+
+// ─── Lua completions ─────────────────────────────────────────────
+function registerLuaCompletions(){
+  var CIK=monaco.languages.CompletionItemKind;
+  var ITEMS=[
+    ['and',CIK.Keyword,'and'],['break',CIK.Keyword,'break'],
+    ['do',CIK.Snippet,'do\n\t$0\nend'],['else',CIK.Keyword,'else'],
+    ['elseif',CIK.Keyword,'elseif ${1:cond} then\n\t$0'],
+    ['end',CIK.Keyword,'end'],['false',CIK.Keyword,'false'],
+    ['for',CIK.Snippet,'for ${1:i} = ${2:1}, ${3:10} do\n\t$0\nend'],
+    ['for...in',CIK.Snippet,'for ${1:k}, ${2:v} in ${3:pairs}(${4:t}) do\n\t$0\nend'],
+    ['function',CIK.Snippet,'function ${1:name}(${2:args})\n\t$0\nend'],
+    ['if',CIK.Snippet,'if ${1:cond} then\n\t$0\nend'],
+    ['if...else',CIK.Snippet,'if ${1:cond} then\n\t$2\nelse\n\t$0\nend'],
+    ['local',CIK.Keyword,'local '],['nil',CIK.Keyword,'nil'],
+    ['not',CIK.Keyword,'not '],['or',CIK.Keyword,'or'],
+    ['repeat',CIK.Snippet,'repeat\n\t$0\nuntil ${1:cond}'],
+    ['return',CIK.Keyword,'return $0'],['true',CIK.Keyword,'true'],
+    ['while',CIK.Snippet,'while ${1:cond} do\n\t$0\nend'],
+    ['print',CIK.Function,'print($0)'],['warn',CIK.Function,'warn($0)'],
+    ['error',CIK.Function,'error(${1:msg}, ${2:2})'],
+    ['tostring',CIK.Function,'tostring($1)'],['tonumber',CIK.Function,'tonumber($1)'],
+    ['type',CIK.Function,'type($1)'],['typeof',CIK.Function,'typeof($1)'],
+    ['ipairs',CIK.Function,'ipairs($1)'],['pairs',CIK.Function,'pairs($1)'],
+    ['pcall',CIK.Function,'pcall($1, $2)'],['xpcall',CIK.Function,'xpcall($1, $2)'],
+    ['require',CIK.Function,'require("$1")'],
+    ['table.insert',CIK.Function,'table.insert($1, $2)'],
+    ['table.remove',CIK.Function,'table.remove($1, $2)'],
+    ['table.find',CIK.Function,'table.find($1, $2)'],
+    ['table.sort',CIK.Function,'table.sort($1, $2)'],
+    ['string.format',CIK.Function,'string.format("$1", $2)'],
+    ['string.sub',CIK.Function,'string.sub($1, $2, $3)'],
+    ['string.find',CIK.Function,'string.find($1, "$2")'],
+    ['string.match',CIK.Function,'string.match($1, "$2")'],
+    ['string.gsub',CIK.Function,'string.gsub($1, "$2", "$3")'],
+    ['string.upper',CIK.Function,'string.upper($1)'],
+    ['string.lower',CIK.Function,'string.lower($1)'],
+    ['math.abs',CIK.Function,'math.abs($1)'],['math.floor',CIK.Function,'math.floor($1)'],
+    ['math.ceil',CIK.Function,'math.ceil($1)'],['math.max',CIK.Function,'math.max($1)'],
+    ['math.min',CIK.Function,'math.min($1)'],['math.random',CIK.Function,'math.random($1)'],
+    ['math.clamp',CIK.Function,'math.clamp($1, $2, $3)'],
+    ['math.pi',CIK.Constant,'math.pi'],['math.huge',CIK.Constant,'math.huge'],
+    ['task.wait',CIK.Function,'task.wait($1)'],['task.spawn',CIK.Function,'task.spawn($1)'],
+    ['task.defer',CIK.Function,'task.defer($1)'],['task.delay',CIK.Function,'task.delay($1, $2)'],
+    ['game',CIK.Variable,'game'],['workspace',CIK.Variable,'workspace'],
+    ['game:GetService',CIK.Method,'game:GetService("$1")'],
+    ['Vector3.new',CIK.Constructor,'Vector3.new(${1:0}, ${2:0}, ${3:0})'],
+    ['CFrame.new',CIK.Constructor,'CFrame.new(${1:0}, ${2:0}, ${3:0})'],
+    ['Color3.fromRGB',CIK.Constructor,'Color3.fromRGB(${1:255}, ${2:255}, ${3:255})'],
+    ['UDim2.new',CIK.Constructor,'UDim2.new(${1:0}, ${2:0}, ${3:0}, ${4:0})'],
+    ['Instance.new',CIK.Constructor,'Instance.new("${1:Part}")'],
+    ['hookfunction',CIK.Function,'hookfunction($1, $2)'],
+    ['newcclosure',CIK.Function,'newcclosure($1)'],
+    ['getgenv',CIK.Function,'getgenv()'],['getrenv',CIK.Function,'getrenv()'],
+    ['getrawmetatable',CIK.Function,'getrawmetatable($1)'],
+    ['setrawmetatable',CIK.Function,'setrawmetatable($1, $2)'],
+    ['readfile',CIK.Function,'readfile("$1")'],['writefile',CIK.Function,'writefile("$1", $2)'],
+    ['request',CIK.Function,'request({\n\tUrl = "$1",\n\tMethod = "${2:GET}"\n})'],
+    ['connect',CIK.Snippet,'${1:event}:Connect(function(${2:args})\n\t$0\nend)'],
+    ['protected',CIK.Snippet,'local ok, err = pcall(function()\n\t$0\nend)\nif not ok then warn(err) end'],
+    ['tween',CIK.Snippet,'local TweenService = game:GetService("TweenService")\nlocal info = TweenInfo.new(${1:1}, Enum.EasingStyle.${2:Quad}, Enum.EasingDirection.${3:Out})\nlocal tween = TweenService:Create($4, info, {${5:prop} = $6})\ntween:Play()'],
+  ];
+  monaco.languages.registerCompletionItemProvider('lua',{
+    triggerCharacters:['.', ':', '"', "'"],
+    provideCompletionItems:function(model,position){
+      var word=model.getWordUntilPosition(position);
+      var range={startLineNumber:position.lineNumber,endLineNumber:position.lineNumber,
+                 startColumn:word.startColumn,endColumn:word.endColumn};
+      return{suggestions:ITEMS.map(function(it){
+        var u=it[2].includes('$');
+        return{label:it[0],kind:it[1],insertText:it[2],
+          insertTextRules:u?monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet:undefined,
+          range};
+      })};
+    }
+  });
+}
+</script>
+</body>
+</html>
